@@ -1,45 +1,35 @@
 package com.bifel.lamp;
 
 import android.annotation.SuppressLint;
-import android.app.AlertDialog;
 import android.app.TimePickerDialog;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.content.BroadcastReceiver;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.database.DataSetObserver;
 import android.os.Build;
+import android.os.Bundle;
 import android.support.annotation.RequiresApi;
 import android.support.v7.app.AppCompatActivity;
-import android.os.Bundle;
 import android.view.View;
-import android.view.ViewGroup;
-import android.widget.ArrayAdapter;
-import android.widget.BaseAdapter;
+import android.widget.AdapterView;
 import android.widget.ImageView;
-import android.widget.ListAdapter;
 import android.widget.TimePicker;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
 
     public static final String ACTION_DATA_RECEIVE = "action_data_receive";
-    public static final String EXTRA_TEXT = "data";
+    public static final String ACTION_STOP_DISCOVERY = "action_stop_discovery";
+    public static final String ACTION_START_DISCOVERY = "action_start_discovery";
+    public static final String EXTRA_TEXT = "extra_text";
 
     private TimePickerDialog alarmDialog;
-    private AlertDialog alertDialog;
+    private ListDialog listDialog;
     private BTAdapter btAdapter;
     private ToastSender toast;
     private BroadcastReceiver mReceiver;
     private ImageView imgLamp;
-    private ArrayAdapter<CharSequence> listAdapter;
-//    private List<CharSequence> list = new ArrayList<>();
 
 
     @Override
@@ -47,20 +37,28 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        listAdapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_single_choice);
-        toast = new ToastSender(getMainLooper(), this);
-        btAdapter = new BTAdapter(BluetoothAdapter.getDefaultAdapter(), this);
+        toast = new ToastSender(this, getMainLooper());
+        btAdapter = new BTAdapter(this, BluetoothAdapter.getDefaultAdapter());
         imgLamp = findViewById(R.id.imgLamp);
         mReceiver = createReceiver();
         alarmDialog = createTimePickerDialog();
-        alertDialog = createAlertDialog();
+
+        listDialog = new ListDialog(this);
+        listDialog.setOnClick(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                btAdapter.connectToDevice(listDialog.getItem(position));
+            }
+        });
 
         IntentFilter filter = new IntentFilter();
         filter.addAction(BluetoothDevice.ACTION_FOUND);
         filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_STARTED);
         filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
-        filter.addAction(ACTION_DATA_RECEIVE);
         filter.addAction(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+        filter.addAction(ACTION_DATA_RECEIVE);
+        filter.addAction(ACTION_STOP_DISCOVERY);
+        filter.addAction(ACTION_START_DISCOVERY);
         registerReceiver(mReceiver, filter);
     }
 
@@ -97,13 +95,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void onRefreshPress(View view) {
-        listAdapter.clear();
         btAdapter.startDiscovery();
-        listAdapter.addAll(btAdapter.getAlreadyPairedBluetoothDevices());
-        listAdapter.notifyDataSetChanged();
-
-        alertDialog.show();
-
+        listDialog.show();
     }
 
     @SuppressLint("DefaultLocale")
@@ -155,42 +148,34 @@ public class MainActivity extends AppCompatActivity {
                 if (action == null) return;
                 switch (action) {
                     case BluetoothAdapter.ACTION_DISCOVERY_STARTED:
+                        listDialog.clear();
+                        listDialog.setDiscoveryMonitor(true);
                         break;
                     case BluetoothAdapter.ACTION_DISCOVERY_FINISHED:
+                        listDialog.setDiscoveryMonitor(false);
                         break;
                     case BluetoothDevice.ACTION_FOUND:
                         BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-//                        list.add(device.getName());
-                        listAdapter.add(device.getName());
-                        listAdapter.notifyDataSetChanged();
+                        System.out.println("Found device " + device.getName());
+                        listDialog.add(device.getName());
                         btAdapter.addNewDevice(device);
-                        toast.send("Found device " + device.getName());
+                        break;
+                    case BluetoothAdapter.ACTION_REQUEST_ENABLE:
+                        startActivityForResult(intent, 0);
                         break;
                     case ACTION_DATA_RECEIVE:
                         Bundle extras = intent.getExtras();
                         if (extras != null) parseData(extras.getString(EXTRA_TEXT));
                         else System.out.println("Extras == null");
                         break;
-                    case BluetoothAdapter.ACTION_REQUEST_ENABLE:
-                        startActivityForResult(intent, 0);
+                    case ACTION_STOP_DISCOVERY:
+                        btAdapter.cancelDiscovery();
+                        break;
+                    case ACTION_START_DISCOVERY:
+                        btAdapter.startDiscovery();
                         break;
                 }
             }
         };
-    }
-
-    private AlertDialog createAlertDialog() {
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Enabled devices")
-                .setAdapter(listAdapter, new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface dialog, int which) {
-                        btAdapter.connectToDevice(listAdapter.getItem(which));
-                    }
-                });
-
-        AlertDialog alertDialog = builder.create();
-        alertDialog.getWindow().setBackgroundDrawableResource(R.color.gray);
-        return alertDialog;
-
     }
 }

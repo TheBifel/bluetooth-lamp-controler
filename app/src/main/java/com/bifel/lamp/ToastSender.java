@@ -9,7 +9,7 @@ public class ToastSender {
     private Handler toastHandler;
     private Context context;
 
-    public ToastSender(Looper mainLooper, Context context) {
+    public ToastSender(Context context, Looper mainLooper) {
         this.toastHandler = new Handler(mainLooper);
         this.context = context;
     }

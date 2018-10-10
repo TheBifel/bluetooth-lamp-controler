@@ -11,7 +11,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,6 +23,7 @@ public class BTAdapter {
     private final static String STANDARD_UUID = "00001101-0000-1000-8000-00805F9B34FB";
 
     private Thread readLoopThread;
+    private Thread connectToBTThread;
     private BluetoothAdapter mBluetoothAdapter;
     private ToastSender toast;
     private OutputStream mmOutputStream;
@@ -31,9 +31,9 @@ public class BTAdapter {
     private Map<String, BluetoothDevice> devices = new HashMap<>();
     private Map<String, BluetoothDevice> notPairedDevices = new HashMap<>();
 
-    public BTAdapter(BluetoothAdapter mBluetoothAdapter, Context context) {
+    public BTAdapter(Context context, BluetoothAdapter mBluetoothAdapter) {
         this.mBluetoothAdapter = mBluetoothAdapter;
-        toast = new ToastSender(context.getMainLooper(), context);
+        toast = new ToastSender(context, context.getMainLooper());
         this.context = context;
 
         if (!mBluetoothAdapter.isEnabled()) {
@@ -56,9 +56,18 @@ public class BTAdapter {
     }
 
     public void connectToDevice(final CharSequence name) {
-        Thread findBTThread = new Thread(new Runnable() {
+        cancelDiscovery();
+        if (connectToBTThread != null && connectToBTThread.isAlive()){
+            toast.send("Still trying connect");
+            return;
+        }
+        connectToBTThread = new Thread(new Runnable() {
             @Override
             public void run() {
+                if (notPairedDevices.containsKey(name.toString())) {
+                    pairDevice(name);
+                    devices.put(name.toString(), notPairedDevices.get(name.toString()));
+                }
                 final BluetoothDevice mmDevice = devices.get(name.toString());
                 try {
                     BluetoothSocket mmSocket = mmDevice.createRfcommSocketToServiceRecord(UUID.fromString(STANDARD_UUID)); //Standard SerialPortService ID
@@ -71,7 +80,7 @@ public class BTAdapter {
                 }
             }
         });
-        findBTThread.start();
+        connectToBTThread.start();
     }
 
     public void sendData(String message) {
