@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/gray"
+    tools:context=".MainActivity">
+
+    <ImageView
+        android:id="@+id/imgRefresh"
+        android:layout_width="50dp"
+        android:layout_height="50dp"
+        android:layout_alignParentEnd="true"
+        android:layout_alignParentTop="true"
+        android:layout_marginEnd="10dp"
+        android:layout_marginTop="10dp"
+        android:contentDescription="@string/img_refresh"
+        android:onClick="onRefreshPress"
+        android:src="@drawable/img_refresh" />
+
+    <ImageView
+        android:layout_width="200dp"
+        android:layout_height="200dp"
+        android:layout_alignParentTop="true"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="100dp"
+        android:onClick="onAlarmPress"
+        android:contentDescription="@string/btn_alarm"
+        android:src="@drawable/img_alarm" />
+
+    <ImageView
+        android:id="@+id/imgLamp"
+        android:layout_width="200dp"
+        android:layout_height="200dp"
+        android:layout_alignParentBottom="true"
+        android:layout_centerHorizontal="true"
+        android:layout_marginBottom="100dp"
+        android:onClick="onLampPress"
+        android:contentDescription="@string/btn_lamp"
+        android:src="@drawable/img_lamp_off" />
+
+
+
+</RelativeLayout>
