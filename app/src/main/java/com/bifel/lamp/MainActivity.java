@@ -22,6 +22,7 @@ public class MainActivity extends AppCompatActivity {
     public static final String ACTION_DATA_RECEIVE = "action_data_receive";
     public static final String ACTION_STOP_DISCOVERY = "action_stop_discovery";
     public static final String ACTION_START_DISCOVERY = "action_start_discovery";
+    public static final String ACTION_CLOSE_LIST_DIALOG = "action_close_list_dialog";
     public static final String EXTRA_TEXT = "extra_text";
 
     private TimePickerDialog alarmDialog;
@@ -59,6 +60,7 @@ public class MainActivity extends AppCompatActivity {
         filter.addAction(ACTION_DATA_RECEIVE);
         filter.addAction(ACTION_STOP_DISCOVERY);
         filter.addAction(ACTION_START_DISCOVERY);
+        filter.addAction(ACTION_CLOSE_LIST_DIALOG);
         registerReceiver(mReceiver, filter);
     }
 
@@ -117,11 +119,11 @@ public class MainActivity extends AppCompatActivity {
     private void parseData(String data) {
         System.out.println(data);
         switch (data) {
-            case "on0000":
+            case "S1":
                 setLampImagine(true);
                 break;
 
-            case "off000":
+            case "S0":
                 setLampImagine(false);
                 break;
         }
@@ -173,6 +175,9 @@ public class MainActivity extends AppCompatActivity {
                         break;
                     case ACTION_START_DISCOVERY:
                         btAdapter.startDiscovery();
+                        break;
+                    case ACTION_CLOSE_LIST_DIALOG:
+                        listDialog.dismiss();
                         break;
                 }
             }

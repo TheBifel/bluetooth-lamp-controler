@@ -6,14 +6,17 @@ import android.bluetooth.BluetoothSocket;
 import android.content.Context;
 import android.content.Intent;
 
+import java.io.BufferedReader;
+import java.io.DataInput;
+import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.lang.reflect.Method;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 public class BTAdapter {
@@ -57,7 +60,7 @@ public class BTAdapter {
 
     public void connectToDevice(final CharSequence name) {
         cancelDiscovery();
-        if (connectToBTThread != null && connectToBTThread.isAlive()){
+        if (connectToBTThread != null && connectToBTThread.isAlive()) {
             toast.send("Still trying connect");
             return;
         }
@@ -66,14 +69,19 @@ public class BTAdapter {
             public void run() {
                 if (notPairedDevices.containsKey(name.toString())) {
                     pairDevice(name);
-                    devices.put(name.toString(), notPairedDevices.get(name.toString()));
+                    devices.put(name.toString(), Objects.requireNonNull(notPairedDevices.get(name.toString())));
                 }
                 final BluetoothDevice mmDevice = devices.get(name.toString());
                 try {
                     BluetoothSocket mmSocket = mmDevice.createRfcommSocketToServiceRecord(UUID.fromString(STANDARD_UUID)); //Standard SerialPortService ID
                     mmSocket.connect();
                     mmOutputStream = mmSocket.getOutputStream();
+                    if (readLoopThread != null) {
+                        readLoopThread.interrupt();
+                        readLoopThread = null;
+                    }
                     beginListenForData(mmSocket.getInputStream());
+                    sendIntentToMainActivity(MainActivity.ACTION_CLOSE_LIST_DIALOG);
                     toast.send("BT Name: " + mmDevice.getName() + "\nBT Address: " + mmDevice.getAddress());
                 } catch (IOException e) {
                     toast.send("Cant connect to " + mmDevice.getName());
@@ -96,24 +104,24 @@ public class BTAdapter {
         }
     }
 
-    public List<CharSequence> getAlreadyPairedBluetoothDevices() {
-        List<CharSequence> pairedDevices = new ArrayList<>();
-
+    public void getAlreadyPairedBluetoothDevices() {
         for (BluetoothDevice device : mBluetoothAdapter.getBondedDevices()) {
             if (device != null) {
-                pairedDevices.add(device.getName());
                 devices.put(device.getName(), device);
             }
         }
-
-        return pairedDevices;
     }
 
     public void addNewDevice(BluetoothDevice device) {
-        notPairedDevices.put(device.getName(), device);
+        if (devices.containsKey(device.getName())) {
+            notPairedDevices.put(device.getName(), device);
+        }
     }
 
     public void startDiscovery() {
+        devices.clear();
+        notPairedDevices.clear();
+        getAlreadyPairedBluetoothDevices();
         mBluetoothAdapter.startDiscovery();
     }
 
@@ -128,38 +136,31 @@ public class BTAdapter {
         }
     }
 
-    private void sendIntentToMainActivity(String data) {
-        Intent intent = new Intent(MainActivity.ACTION_DATA_RECEIVE);
+    @SuppressWarnings("SameParameterValue")
+    private void sendIntentToMainActivity(String action, String data) {
+        Intent intent = new Intent(action);
         intent.putExtra(MainActivity.EXTRA_TEXT, data);
         context.sendBroadcast(intent);
     }
 
+    @SuppressWarnings("SameParameterValue")
+    private void sendIntentToMainActivity(String action) {
+        Intent intent = new Intent(action);
+        context.sendBroadcast(intent);
+    }
+
     private void beginListenForData(final InputStream mmInputStream) {
+
         readLoopThread = new Thread(new Runnable() {
-            private String data;
-
             public void run() {
-                while (!readLoopThread.isInterrupted()) {
+                BufferedReader reader = new BufferedReader(new InputStreamReader(mmInputStream));
+                while (readLoopThread.isAlive()) {
                     try {
-                        byte[] packetBytes = new byte[6];
-                        //noinspection ResultOfMethodCallIgnored
-                        mmInputStream.read(packetBytes);
-                        data = new String(packetBytes, "US-ASCII");
-                        System.out.println("Read data - " + data);
-
-                        sendIntentToMainActivity(data);
-
-                    } catch (IOException ignored) {
-                    }
+                        sendIntentToMainActivity(MainActivity.ACTION_DATA_RECEIVE, reader.readLine());
+                    } catch (IOException ignored) {}
                 }
             }
         });
         readLoopThread.start();
     }
-
-    public void intentEcho(String text) {
-        sendIntentToMainActivity(text);
-    }
-
-
 }

@@ -79,6 +79,5 @@ public class ListDialog extends Dialog {
     private void sendIntentToMainActivity(String action) {
         Intent intent = new Intent(action);
         context.sendBroadcast(intent);
-
     }
 }
