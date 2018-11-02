@@ -7,13 +7,10 @@ import android.content.Context;
 import android.content.Intent;
 
 import java.io.BufferedReader;
-import java.io.DataInput;
-import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -73,6 +70,7 @@ public class BTAdapter {
                 }
                 final BluetoothDevice mmDevice = devices.get(name.toString());
                 try {
+                    assert mmDevice != null;
                     BluetoothSocket mmSocket = mmDevice.createRfcommSocketToServiceRecord(UUID.fromString(STANDARD_UUID)); //Standard SerialPortService ID
                     mmSocket.connect();
                     mmOutputStream = mmSocket.getOutputStream();
@@ -82,6 +80,7 @@ public class BTAdapter {
                     }
                     beginListenForData(mmSocket.getInputStream());
                     sendIntentToMainActivity(MainActivity.ACTION_CLOSE_LIST_DIALOG);
+                    sendIntentToMainActivity(MainActivity.ACTION_CONNECTED);
                     toast.send("BT Name: " + mmDevice.getName() + "\nBT Address: " + mmDevice.getAddress());
                 } catch (IOException e) {
                     toast.send("Cant connect to " + mmDevice.getName());
@@ -94,6 +93,7 @@ public class BTAdapter {
     public void sendData(String message) {
         if (mmOutputStream != null) {
             try {
+                message = message + '\n';
                 mmOutputStream.write(message.getBytes());
             } catch (IOException e) {
                 toast.send("Cant write to output stream");
@@ -128,8 +128,8 @@ public class BTAdapter {
     private void pairDevice(CharSequence name) {
         final BluetoothDevice device = devices.get(name.toString());
         try {
-            Method method = device.getClass().getMethod("createBond", (Class[]) null);
-            method.invoke(device, (Object[]) null);
+            assert device != null;
+            device.createBond();
         } catch (Exception e) {
             toast.send("Cant pair to this device");
             e.printStackTrace();
@@ -154,7 +154,7 @@ public class BTAdapter {
         readLoopThread = new Thread(new Runnable() {
             public void run() {
                 BufferedReader reader = new BufferedReader(new InputStreamReader(mmInputStream));
-                while (readLoopThread.isAlive()) {
+                while (readLoopThread != null && readLoopThread.isAlive()) {
                     try {
                         sendIntentToMainActivity(MainActivity.ACTION_DATA_RECEIVE, reader.readLine());
                     } catch (IOException ignored) {}

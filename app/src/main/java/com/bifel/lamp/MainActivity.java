@@ -17,12 +17,22 @@ import android.widget.AdapterView;
 import android.widget.ImageView;
 import android.widget.TimePicker;
 
+import java.sql.Timestamp;
+import java.time.LocalTime;
+import java.time.temporal.ChronoUnit;
+import java.time.temporal.Temporal;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.GregorianCalendar;
+import java.util.concurrent.TimeUnit;
+
 public class MainActivity extends AppCompatActivity {
 
     public static final String ACTION_DATA_RECEIVE = "action_data_receive";
     public static final String ACTION_STOP_DISCOVERY = "action_stop_discovery";
     public static final String ACTION_START_DISCOVERY = "action_start_discovery";
     public static final String ACTION_CLOSE_LIST_DIALOG = "action_close_list_dialog";
+    public static final String ACTION_CONNECTED = "action_connected";
     public static final String EXTRA_TEXT = "extra_text";
 
     private TimePickerDialog alarmDialog;
@@ -61,6 +71,7 @@ public class MainActivity extends AppCompatActivity {
         filter.addAction(ACTION_STOP_DISCOVERY);
         filter.addAction(ACTION_START_DISCOVERY);
         filter.addAction(ACTION_CLOSE_LIST_DIALOG);
+        filter.addAction(ACTION_CONNECTED);
         registerReceiver(mReceiver, filter);
     }
 
@@ -85,11 +96,10 @@ public class MainActivity extends AppCompatActivity {
 
     public void onLampPress(View view) {
         if (btAdapter.isOutputStreamActive()) {
-            btAdapter.sendData("S00000");
+            btAdapter.sendData("S");
         } else {
             toast.send("Can't send data");
         }
-//        btAdapter.intentEcho("on0000");
     }
 
     public void onAlarmPress(View view) {
@@ -103,8 +113,23 @@ public class MainActivity extends AppCompatActivity {
 
     @SuppressLint("DefaultLocale")
     private void setAlarm(int hour, int minutes) {
-        System.out.println("Time picker dialog: hour - " + hour + " minutes - " + minutes);
-        btAdapter.sendData(String.format("%06d%n", hour * 60 + minutes));
+        long currentTime = System.currentTimeMillis();
+
+        Calendar calendar = GregorianCalendar.getInstance();
+        calendar.setTimeInMillis(currentTime);
+        int currentMinutes = calendar.get(Calendar.MINUTE);
+        int currentHour = calendar.get(Calendar.HOUR_OF_DAY);
+
+        System.out.println("Current hour " + currentHour + "| Current minute - " + currentMinutes);
+
+        long currentLocalMinutes = (currentHour * 60) + currentMinutes;
+        long futureLocalMinutes = (hour * 60) + minutes;
+
+        long dif = futureLocalMinutes - currentLocalMinutes;
+        dif += dif < 0 ? 1440 : 0; // 1440 is a minutes in day
+        long delayToAlarmInMinutes = TimeUnit.MINUTES.convert(dif, TimeUnit.MINUTES);
+
+        btAdapter.sendData("A" + delayToAlarmInMinutes * 60_000);
 
     }
 
@@ -118,13 +143,18 @@ public class MainActivity extends AppCompatActivity {
 
     private void parseData(String data) {
         System.out.println(data);
-        switch (data) {
-            case "S1":
-                setLampImagine(true);
+        switch (data.substring(0, 1)) {
+            case "S":
+                if ("S1".equals(data)) {
+                    setLampImagine(true);
+                } else {
+                    setLampImagine(false);
+                }
                 break;
-
-            case "S0":
-                setLampImagine(false);
+            case "A":
+                int timeInMillis = Integer.valueOf(data.substring(1, data.length()));
+                System.out.println(timeInMillis);
+                toast.send("Alarm will flash in " + timeInMillis / 3_600_000 + ":" + timeInMillis % 3_600_000 / 60_000);
                 break;
         }
 
@@ -178,6 +208,9 @@ public class MainActivity extends AppCompatActivity {
                         break;
                     case ACTION_CLOSE_LIST_DIALOG:
                         listDialog.dismiss();
+                        break;
+                    case ACTION_CONNECTED:
+                        btAdapter.sendData("O");
                         break;
                 }
             }

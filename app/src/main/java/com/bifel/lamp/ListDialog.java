@@ -67,6 +67,7 @@ public class ListDialog extends Dialog {
         adapter.notifyDataSetChanged();
     }
 
+    @SuppressWarnings("unused")
     public void addAll(Collection<CharSequence> item) {
         adapter.addAll(item);
         adapter.notifyDataSetChanged();
