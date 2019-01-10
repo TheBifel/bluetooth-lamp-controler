@@ -1,4 +1,4 @@
-package com.bifel.lamp;
+package com.bifel.lamp.activity;
 
 import android.annotation.SuppressLint;
 import android.app.TimePickerDialog;
@@ -8,8 +8,10 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.os.Build;
 import android.os.Bundle;
+import android.preference.PreferenceManager;
 import android.support.annotation.RequiresApi;
 import android.support.v7.app.AppCompatActivity;
 import android.view.View;
@@ -17,12 +19,12 @@ import android.widget.AdapterView;
 import android.widget.ImageView;
 import android.widget.TimePicker;
 
-import java.sql.Timestamp;
-import java.time.LocalTime;
-import java.time.temporal.ChronoUnit;
-import java.time.temporal.Temporal;
+import com.bifel.lamp.BTAdapter;
+import com.bifel.lamp.ListDialog;
+import com.bifel.lamp.R;
+import com.bifel.lamp.ToastSender;
+
 import java.util.Calendar;
-import java.util.Date;
 import java.util.GregorianCalendar;
 import java.util.concurrent.TimeUnit;
 
@@ -41,6 +43,7 @@ public class MainActivity extends AppCompatActivity {
     private ToastSender toast;
     private BroadcastReceiver mReceiver;
     private ImageView imgLamp;
+    private SharedPreferences sp;
 
 
     @Override
@@ -54,11 +57,13 @@ public class MainActivity extends AppCompatActivity {
         mReceiver = createReceiver();
         alarmDialog = createTimePickerDialog();
 
+        sp = PreferenceManager.getDefaultSharedPreferences(this);
+
         listDialog = new ListDialog(this);
         listDialog.setOnClick(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-                btAdapter.connectToDevice(listDialog.getItem(position));
+                btAdapter.connectToDevice(listDialog.getItem(position).toString());
             }
         });
 
@@ -96,7 +101,7 @@ public class MainActivity extends AppCompatActivity {
 
     public void onLampPress(View view) {
         if (btAdapter.isOutputStreamActive()) {
-            btAdapter.sendData("S");
+            btAdapter.send("S");
         } else {
             toast.send("Can't send data");
         }
@@ -109,6 +114,16 @@ public class MainActivity extends AppCompatActivity {
     public void onRefreshPress(View view) {
         btAdapter.startDiscovery();
         listDialog.show();
+    }
+
+    @Override
+    protected void onResume() {
+        btAdapter.send("D" + sp.getString("flashIntensity", "0"));
+        super.onResume();
+    }
+
+    public void onSettingsPress(View view) {
+        startActivity(new Intent(this, SettingsActivity.class));
     }
 
     @SuppressLint("DefaultLocale")
@@ -129,7 +144,7 @@ public class MainActivity extends AppCompatActivity {
         dif += dif < 0 ? 1440 : 0; // 1440 is a minutes in day
         long delayToAlarmInMinutes = TimeUnit.MINUTES.convert(dif, TimeUnit.MINUTES);
 
-        btAdapter.sendData("A" + delayToAlarmInMinutes * 60_000);
+        btAdapter.send("A" + delayToAlarmInMinutes * 60_000);
 
     }
 
@@ -142,7 +157,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void parseData(String data) {
-        System.out.println(data);
         switch (data.substring(0, 1)) {
             case "S":
                 if ("S1".equals(data)) {
@@ -188,9 +202,11 @@ public class MainActivity extends AppCompatActivity {
                         break;
                     case BluetoothDevice.ACTION_FOUND:
                         BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-                        System.out.println("Found device " + device.getName());
-                        listDialog.add(device.getName());
-                        btAdapter.addNewDevice(device);
+                        if (device != null) {
+                            System.out.println("Found device " + device.getName());
+                            listDialog.add(device.getName());
+                            btAdapter.addNewDevice(device);
+                        }
                         break;
                     case BluetoothAdapter.ACTION_REQUEST_ENABLE:
                         startActivityForResult(intent, 0);
@@ -210,7 +226,7 @@ public class MainActivity extends AppCompatActivity {
                         listDialog.dismiss();
                         break;
                     case ACTION_CONNECTED:
-                        btAdapter.sendData("O");
+                        btAdapter.send("O");
                         break;
                 }
             }

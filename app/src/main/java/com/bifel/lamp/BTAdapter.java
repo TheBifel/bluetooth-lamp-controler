@@ -6,6 +6,8 @@ import android.bluetooth.BluetoothSocket;
 import android.content.Context;
 import android.content.Intent;
 
+import com.bifel.lamp.activity.MainActivity;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -13,7 +15,6 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Objects;
 import java.util.UUID;
 
 public class BTAdapter {
@@ -26,10 +27,9 @@ public class BTAdapter {
     private Thread connectToBTThread;
     private BluetoothAdapter mBluetoothAdapter;
     private ToastSender toast;
-    private OutputStream mmOutputStream;
+    private OutputStream outputStream;
     private Context context;
     private Map<String, BluetoothDevice> devices = new HashMap<>();
-    private Map<String, BluetoothDevice> notPairedDevices = new HashMap<>();
 
     public BTAdapter(Context context, BluetoothAdapter mBluetoothAdapter) {
         this.mBluetoothAdapter = mBluetoothAdapter;
@@ -45,6 +45,13 @@ public class BTAdapter {
         if (readLoopThread != null) {
             readLoopThread.interrupt();
         }
+        if (outputStream != null) {
+            try {
+                outputStream.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
     }
 
     public void cancelDiscovery() {
@@ -52,10 +59,10 @@ public class BTAdapter {
     }
 
     public boolean isOutputStreamActive() {
-        return mmOutputStream != null;
+        return outputStream != null;
     }
 
-    public void connectToDevice(final CharSequence name) {
+    public void connectToDevice(final String name) {
         cancelDiscovery();
         if (connectToBTThread != null && connectToBTThread.isAlive()) {
             toast.send("Still trying connect");
@@ -64,16 +71,20 @@ public class BTAdapter {
         connectToBTThread = new Thread(new Runnable() {
             @Override
             public void run() {
-                if (notPairedDevices.containsKey(name.toString())) {
-                    pairDevice(name);
-                    devices.put(name.toString(), Objects.requireNonNull(notPairedDevices.get(name.toString())));
+
+                final BluetoothDevice device = devices.get(name);
+                if (device == null){
+                    toast.send("Try connect again");
+                    return;
                 }
-                final BluetoothDevice mmDevice = devices.get(name.toString());
+                if (device.getBondState() == BluetoothDevice.BOND_NONE) {
+                    pairDevice(device);
+                }
+
                 try {
-                    assert mmDevice != null;
-                    BluetoothSocket mmSocket = mmDevice.createRfcommSocketToServiceRecord(UUID.fromString(STANDARD_UUID)); //Standard SerialPortService ID
+                    BluetoothSocket mmSocket = device.createRfcommSocketToServiceRecord(UUID.fromString(STANDARD_UUID));
                     mmSocket.connect();
-                    mmOutputStream = mmSocket.getOutputStream();
+                    outputStream = mmSocket.getOutputStream();
                     if (readLoopThread != null) {
                         readLoopThread.interrupt();
                         readLoopThread = null;
@@ -81,20 +92,21 @@ public class BTAdapter {
                     beginListenForData(mmSocket.getInputStream());
                     sendIntentToMainActivity(MainActivity.ACTION_CLOSE_LIST_DIALOG);
                     sendIntentToMainActivity(MainActivity.ACTION_CONNECTED);
-                    toast.send("BT Name: " + mmDevice.getName() + "\nBT Address: " + mmDevice.getAddress());
+                    toast.send("BT Name: " + device.getName() + "\nBT Address: " + device.getAddress());
                 } catch (IOException e) {
-                    toast.send("Cant connect to " + mmDevice.getName());
+                    toast.send("Cant connect to " + device.getName());
                 }
             }
         });
         connectToBTThread.start();
     }
 
-    public void sendData(String message) {
-        if (mmOutputStream != null) {
+    public void send(String message) {
+        if (outputStream != null) {
             try {
                 message = message + '\n';
-                mmOutputStream.write(message.getBytes());
+                outputStream.write(message.getBytes());
+                System.out.println(message);
             } catch (IOException e) {
                 toast.send("Cant write to output stream");
                 e.printStackTrace();
@@ -113,22 +125,17 @@ public class BTAdapter {
     }
 
     public void addNewDevice(BluetoothDevice device) {
-        if (devices.containsKey(device.getName())) {
-            notPairedDevices.put(device.getName(), device);
-        }
+            devices.put(device.getName(), device);
     }
 
     public void startDiscovery() {
         devices.clear();
-        notPairedDevices.clear();
         getAlreadyPairedBluetoothDevices();
         mBluetoothAdapter.startDiscovery();
     }
 
-    private void pairDevice(CharSequence name) {
-        final BluetoothDevice device = devices.get(name.toString());
+    private void pairDevice(BluetoothDevice device) {
         try {
-            assert device != null;
             device.createBond();
         } catch (Exception e) {
             toast.send("Cant pair to this device");

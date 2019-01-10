@@ -2,9 +2,10 @@
 #include <Ultrasonic.h>
 #include <SoftwareSerial.h>
 #define DISTANCE_LIMIT 15 //CM
+#define HIDE_DELAY 200
 #define LAMP 2
 
-Ultrasonic ultrasonic(9, 8); // 9 - Trig, 8 - Echo
+Ultrasonic ultrasonic(9, 10); // 9 - Trig, 10 - Echo
 SoftwareSerial mySerial(7, 8); // 7 - TX, 8 - RX
 
 long timeToAlarm = 0;
@@ -16,7 +17,7 @@ void setup() {
   pinMode(LAMP, OUTPUT);
   Serial.begin(9600);
   mySerial.begin(9600);
-  mySerial.setTimeout(10);
+  mySerial.setTimeout(50);
 }
 
 
@@ -44,6 +45,7 @@ void loop() {
     if (timeToAlarm != 0 && timeToAlarm < millis()) {
         if (delayBetwenAlarmFlashes == 0){
           setLight(true);
+          timeToAlarm = 0;
         } else {
             timeOfLAstAlarmFlash = alarmLight(timeOfLAstAlarmFlash); 
         }
@@ -61,14 +63,12 @@ void loop() {
           ultrasonic_triggered = millis();
         }
     } else {
-        if (ultrasonic_triggered != 0 && (millis()) - ultrasonic_triggered > 500){
+        if (ultrasonic_triggered != 0 && (millis()) - ultrasonic_triggered > HIDE_DELAY){
           changeLight();
           timeToAlarm = 0;
         }
         ultrasonic_triggered = 0;
     }
-    
-    delay(100);
 }
 
 
@@ -97,7 +97,8 @@ long alarmLight(long lastFlash) {
 }
 
 void setDelayBetwenAlarmFalashes(String data) {
-  delayBetwenAlarmFlashes = data.substring(1, data.length()).toInt() * 1000;
+  delayBetwenAlarmFlashes = data.substring(1, data.length()).toInt();
+  mySerial.println("D" + String(delayBetwenAlarmFlashes));
 }
 
 void isLightOn() {

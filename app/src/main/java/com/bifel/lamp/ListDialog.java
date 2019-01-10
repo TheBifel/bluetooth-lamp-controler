@@ -10,6 +10,8 @@ import android.widget.ArrayAdapter;
 import android.widget.ImageView;
 import android.widget.ListView;
 
+import com.bifel.lamp.activity.MainActivity;
+
 import java.util.Collection;
 
 public class ListDialog extends Dialog {

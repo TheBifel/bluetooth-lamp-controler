@@ -6,5 +6,8 @@
         <item name="android:windowFullscreen">true</item>
         <item name="android:windowContentOverlay">@null</item>
     </style>
+    <style name="DarkSettings" parent="AlertDialog.AppCompat">
+        <item name="android:background">@color/gray</item>
+    </style>
 
 </resources>
